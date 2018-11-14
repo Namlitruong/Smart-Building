@@ -7,12 +7,6 @@
 #include <DHT.h>
 #include <Adafruit_Sensor.h>
 
-volatile unsigned char pm25;
-volatile unsigned char pm10;
-volatile bool flag = false;
-unsigned char inChar;
-int count1 = 0;
-
 //###################################################################
 //WIFI configuration
 SoftwareSerial esp(6 ,7); // RX, TX
@@ -35,10 +29,10 @@ DHT dht(5, DHT11);
 
 //######################################################################
 //Delay
-unsigned long count;
+int count;
+unsigned long sec;
 
 void delay_ms (uint16_t millisecond) {
-  unsigned long sec;
   sec = ((16000000/12)/1000)*millisecond;
   for (count = 0; count < sec; count ++);
 }
@@ -92,8 +86,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.println(arrivedData);
   Serial.println("########################");
   Serial.println();
-  //delay_ms(300);
-  //turnLED();
 }
 
 void reconnect() {
@@ -143,16 +135,24 @@ void setup()
   //DHT
   dht.begin ();
   RobotInfor();
+  
 }
 
 void loop(){
     if (!client.connected()) {
     reconnect();
     client.subscribe ("System", 0);
-    //client.loop();
   }
   client.loop();
-  delay_ms (1000);
+  delay_ms (2000);
   mqttPublish();
   return;
 }
+
+//void loop (){
+//  Serial.println ("1");
+//  delay_ms (1000);
+//  Serial.println ("0");
+//  delay_ms (1000);
+//}
+
