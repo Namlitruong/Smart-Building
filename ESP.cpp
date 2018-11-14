@@ -3,48 +3,57 @@
 #include <WiFiEspServer.h>
 #include <PubSubClient.h>
 #include <SoftwareSerial.h>
+#include <SPI.h>
+#include <DHT.h>
+#include <Adafruit_Sensor.h>
+
+volatile unsigned char pm25;
+volatile unsigned char pm10;
+volatile bool flag = false;
+unsigned char inChar;
+int count1 = 0;
 
 //###################################################################
 //WIFI configuration
-SoftwareSerial esp(6,7); // RX, TX
+SoftwareSerial esp(6 ,7); // RX, TX
 
 char ssid[] = "Namli";            // your network SSID (name)
 char pass[] = "9903098610";        // your network password
 int status = WL_IDLE_STATUS;     // the Wifi radio's status
 
-//char mqttServer[] = "mqtt.thingspeak.com";
-char mqttServer[] = "192.168.137.48";
-char ClientID[] = "Robot3";
+char mqttServer[] = "mqtt.thingspeak.com";
+//char mqttServer[] = "171.253.28.46";
+char ClientID[] = "Station1";
 String arrivedData;
 
 WiFiEspClient espClient;
 PubSubClient client(espClient);
 
+//###################################################################
+//DHT configuration
+DHT dht(5, DHT11);
+
+//######################################################################
+//Delay
+unsigned long count;
+
+void delay_ms (uint16_t millisecond) {
+  unsigned long sec;
+  sec = ((16000000/12)/1000)*millisecond;
+  for (count = 0; count < sec; count ++);
+}
+//###############################################################
+
 void RobotInfor(){
   
   // print the SSID of the network you're attached to
-  Serial.print("ClientID: ");
-  Serial.println (ClientID);
-  Serial.print("SSID: ");
-  Serial.println(WiFi.SSID());
+  Serial.print("###ClientID: ");
+  Serial.print (ClientID);
 
   // print your WiFi shield's IP address
   IPAddress ip = WiFi.localIP();
-  Serial.print("IP Address: ");
+  Serial.print("---IP Address: ");
   Serial.println(ip);
-
-  // print your MAC address
-  byte mac[6];
-  WiFi.macAddress(mac);
-  char buf[20];
-  sprintf(buf, "%02X:%02X:%02X:%02X:%02X:%02X", mac[5], mac[4], mac[3], mac[2], mac[1], mac[0]);
-  Serial.print("MAC address: ");
-  Serial.println(buf);
-
-  // print the received signal strength
-  long rssi = WiFi.RSSI();
-  Serial.print("Signal strength (RSSI): ");
-  Serial.println(rssi);
 }
 
 void ConnectToWiFi (){
@@ -70,16 +79,6 @@ void ConnectToWiFi (){
   Serial.println("You're connected to the network");
 }
 
-//void callback(char* topic, byte* payload, unsigned int length) {
-//  Serial.print("Message arrived [");
-//  Serial.print(topic);
-//  Serial.print("] ");
-//  for (int i=0;i<length;i++) {
-//    Serial.print((char)payload[i]);
-//  }
-//  Serial.println();
-//}
-
 void callback(char* topic, byte* payload, unsigned int length) {
   arrivedData = "";
   Serial.print("Message arrived [");
@@ -93,6 +92,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.println(arrivedData);
   Serial.println("########################");
   Serial.println();
+  //delay_ms(300);
+  //turnLED();
 }
 
 void reconnect() {
@@ -108,22 +109,23 @@ void reconnect() {
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
-      delay(5000);
+      delay_ms(5000);
     }
   }
 }
 
-void mqttPublish (String Data){
+void mqttPublish (){
   Serial.println ("Sending data");
+  int h = dht.readHumidity();
+  int t = dht.readTemperature();
   // Data
+  String Data = String(h) + String (";") + String(t);
   int length = Data.length();
   char Buff[length];
   Data.toCharArray (Buff, length + 1);
-  Serial.println (Buff);
   //Publish packet
   client.publish( ClientID, Buff );
-
-  //delay(1000);
+  Serial.println (Data);
   return;
 }
 
@@ -137,23 +139,20 @@ void setup()
   ConnectToWiFi ();
   client.setServer (mqttServer, 1883);
   client.setCallback (callback);
+  //####################
+  //DHT
+  dht.begin ();
   RobotInfor();
-  //client.subscribe ("System", 0);
-  pinMode (13, OUTPUT);
 }
 
 void loop(){
-  if (!client.connected()) {
+    if (!client.connected()) {
     reconnect();
     client.subscribe ("System", 0);
+    //client.loop();
   }
   client.loop();
-  delay(100);
-  //mqttPublish ("123");
-  if (arrivedData == "1"){
-    digitalWrite (13, HIGH);
-  }else{
-    digitalWrite (13, LOW);
-  }
+  delay_ms (1000);
+  mqttPublish();
   return;
 }
